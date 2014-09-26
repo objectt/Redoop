@@ -2,8 +2,6 @@ package com.boxple.redoop;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -17,15 +15,18 @@ public class Redoop extends Configured implements Tool{
     
     @Override
     public int run(String[] args) throws Exception {    
-        if (args.length != 2) {
-          System.out.println("usage: [input] [output]");
-          System.exit(-1);
-        }
+    	//if (args.length != 2) {
+    	//	System.out.println("usage: [input] [output]");
+    	//	System.exit(-1);
+    	//}
         
         Configuration conf = new Configuration(true);
         conf.set("mapred.redishashinputformat.hosts", "localhost");
+        conf.set("mapred.redishashinputformat.key", "household");
   
         Job job = Job.getInstance(new Configuration());
+        job.setJarByClass(getClass());
+        job.setJobName(getClass().getSimpleName());
         //job.setOutputKeyClass(Text.class);
         //job.setOutputValueClass(IntWritable.class);
 

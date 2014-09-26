@@ -92,6 +92,7 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 			keyValueMapIter = jedis.hgetAll(hashKey).entrySet().iterator();
 			//LOG.info("Got " + totalKVs + " from " + hashKey); 
 			jedis.disconnect();
+			jedis.close();
 		}
 
 		// This method is called by Mapper¡¯s run method to ensure all key/value pairs are read
