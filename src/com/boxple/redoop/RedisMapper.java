@@ -34,7 +34,7 @@ public class RedisMapper extends Mapper<Text, Text, Text, IntWritable>{
 			combiner.write(word, one, context);
 		}
 		
-		//System.out.println("map - " + key.toString());
+		System.out.println("map - " + key.toString());
 		//contex.write(key, one);
 	}
 	

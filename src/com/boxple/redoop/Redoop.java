@@ -30,8 +30,8 @@ public class Redoop extends Configured implements Tool{
         Configuration conf = this.getConf();
         //args = new GenericOptionsParser(conf, args).getRemainingArgs();
         
-        conf.set("mapred.redishashinputformat.hosts", "localhost");
-        conf.set("mapred.redishashinputformat.key", "household");
+        conf.set("mapreduce.redis.host", "127.0.0.1");
+        conf.set("mapreduce.redis.port", "7000");
         //conf.set("mapred.redishashinputformat.key", "test");
   
         Job job = Job.getInstance(conf);

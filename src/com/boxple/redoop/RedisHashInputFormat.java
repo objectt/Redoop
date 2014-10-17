@@ -23,68 +23,53 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import redis.clients.jedis.HostAndPort;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.ScanResult;
+//import redis.clients.jedis.exceptions.JedisMovedDataException;
 
 
 public class RedisHashInputFormat extends InputFormat<Text, Text> {
-
-	// Should connect to Redis Manager for host info
-	public static final String REDIS_HOSTS_CONF = "mapred.redishashinputformat.hosts";
-	public static final String REDIS_HASH_KEY_CONF = "mapred.redishashinputformat.key";
-
-	public static JedisCluster jedis;
-	
 	private static final Log LOG = LogFactory.getLog(RedisHashInputFormat.class);
 	
-	public static void setRedisMaster(Job job, String host){
-		
+	public static final String REDIS_HOST_CONF = "mapreduce.redis.host"; // Master Redis
+	public static final String REDIS_PORT_CONF = "mapreduce.redis.port";
+	
+	public static JedisCluster jedis;
+
+	public static void setRedisMaster(Job job, String host) {
+		job.getConfiguration().set(REDIS_HOST_CONF, host);
 	}
 
-	public static void setRedisHosts(Job job, String hosts) {
-		job.getConfiguration().set(REDIS_HOSTS_CONF, hosts);
-	}
-
-	public static void setRedisHashKey(Job job, String hashKey) {
-		job.getConfiguration().set(REDIS_HASH_KEY_CONF, hashKey);
-	}
-
-	// This method will return a list of InputSplit objects.
-	// The framework uses this to create an equivalent number of map tasks
+	// Ran by AppMaster once
+	// Create an equivalent number of map tasks = # of Redis nodes
 	public List<InputSplit> getSplits(JobContext job) throws IOException {
 
-		//System.out.println("RedisHashInputFormat::getSplits");
 		LOG.info("RedisHashInputFormat::getSplits");
-		// Get our configuration values and ensure they are set
-//		String hosts = job.getConfiguration().get(REDIS_HOSTS_CONF);
-//		if (hosts == null || hosts.isEmpty()) {
-//			throw new IOException(REDIS_HOSTS_CONF + " is not set in configuration.");
-//		}
-//
-//		String hashKey = job.getConfiguration().get(REDIS_HASH_KEY_CONF);
-//		if (hashKey == null || hashKey.isEmpty()) {
-//			throw new IOException(REDIS_HASH_KEY_CONF + " is not set in configuration.");
-//		}
+		
+		String host = job.getConfiguration().get(REDIS_HOST_CONF);
+		if (host == null || host.isEmpty()) {
+			throw new IOException(REDIS_HOST_CONF + " is not set in configuration.");
+		}
+		
+		String port = job.getConfiguration().get(REDIS_PORT_CONF);
+		if (port == null || port.isEmpty()) {
+			throw new IOException(REDIS_PORT_CONF + " is not set in configuration.");
+		}
 
-		// Create an input split for each Redis instance
-		// More on this custom split later, just know that one is created per host
-		//for (JedisPool pool : jedis.getClusterNodes().values())){
+		// Create an input split for each Redis instance (Each host)
 		Set<HostAndPort> jedisClusterNodes = new HashSet<HostAndPort>();
-		jedisClusterNodes.add(new HostAndPort("127.0.0.1", 7000));
+		jedisClusterNodes.add(new HostAndPort(host, Integer.parseInt(port)));
 		jedis = new JedisCluster(jedisClusterNodes);
 		
+		// Get cluster info
 		List<InputSplit> splits = new ArrayList<InputSplit>();
-		for (String host : jedis.getClusterNodes().keySet()){
-			//System.out.println(key);
-			String[] uri = host.split(":");
-			
-			splits.add(new RedisHashInputSplit(uri[0], uri[1]));
+		for (String hosts : jedis.getClusterNodes().keySet()){
+			String[] uri = hosts.split(":");			
+			splits.add(new RedisHashInputSplit(uri[0], uri[1]));	// Host, Port
 		}
 		jedis.close();
-//		List<InputSplit> splits = new ArrayList<InputSplit>();
-//		for (String host : hosts.split(",")) {
-//			splits.add(new RedisHashInputSplit(host, hashKey));
-//		}
-
+		
 		return splits;
 	}
 
@@ -95,77 +80,110 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 		return new RedisHashRecordReader();
 	}
 
-	// This custom RecordReader will pull in all key/value pairs from a Redis instance for a given hash
+	// Ran by each container
 	public static class RedisHashRecordReader extends RecordReader<Text, Text> {
-		// A number of member variables to iterate and store key/value pairs from Redis
-				
+		
 		private Iterator<Entry<String, String>> keyValueMapIter = null;
 		//private Map keyValueMap = new HashMap();
 		//private Set keyValueSet = new HashSet();
 		
 		private Text key = new Text(), value = new Text();
-		private int processedKVs = 0, totalKVs = 0, currentKey = 1;
+		private int processedKVs = 0, totalKVs = 0;
 		private Entry<String, String> currentEntry = null;
-		//private Jedis jedis = new Jedis("localhost");
+		private Jedis jedisInstance;
+		private List<String> keys;
 
 		// Ran by each Mapper
 		// Initialize is called by the framework and given an InputSplit to process
+		@SuppressWarnings("deprecation")
 		public void initialize(InputSplit genericSplit, TaskAttemptContext context)
 			throws IOException, InterruptedException {
-
-			LOG.info("RedisHashInputFormat::initialize");
 			
 			RedisHashInputSplit split = (RedisHashInputSplit) genericSplit;
 			
+			LOG.info("RedisHashInputFormat::initialize");
+			LOG.info("Split.addr = " + split.getHost() + ":" + split.getPort());
+			
+			jedisInstance = new Jedis(split.getHost(), split.getPort());
+			jedisInstance.connect();
+			//jedisInstance.getClient().setTimeoutInfinite();
+			
+			ScanResult<String> scanResult = jedisInstance.scan(0);
+            List<String> result = scanResult.getResult();
+            int cursor = scanResult.getCursor();
+
+            List<String> keys = new ArrayList<String>(result);
+
+            while(cursor > 0){                    
+                    scanResult = jedisInstance.scan(cursor);
+                    result = scanResult.getResult();
+                    keys.addAll(result);
+                    cursor = scanResult.getCursor();                   
+            }
+            
+            totalKVs = keys.size();
+			
 			// Get the host location from the InputSplit
 			//String host = split.getLocations()[0];
-			//String hashKey = ((RedisHashInputSplit) split).getHashKey();
-
-			// Create a new connection to Redis
-			//Jedis jedis = new Jedis(host);
-			//jedis.connect();
-			//jedis.getClient().setTimeoutInfinite();
-			
-			Set<HostAndPort> jedisClusterNodes = new HashSet<HostAndPort>();
+			//String hashKey = ((RedisHashInputSplit) split).getHashKey();			
+			//Set<HostAndPort> jedisClusterNodes = new HashSet<HostAndPort>();
 			//jedisClusterNodes.add(new HostAndPort("127.0.0.1", 7000));
-			jedisClusterNodes.add(new HostAndPort(split.getHost(), split.getPort()));
-			jedis = new JedisCluster(jedisClusterNodes);
-
-			//int householdCounter = 1000;
-			
-			//totalKVs = jedis.hlen(hashKey);
-			//totalKVs = jedis.keys('*');
-			//totalKVs = Integer.parseInt(jedis.get("member_counter"));
-			totalKVs = 100000;
-			//keyValueMapIter = jedis.hgetAll("member:" + currentKey).entrySet().iterator();
-			
-			//jedis.disconnect();
-			//jedis.close();
+			//jedisClusterNodes.add(new HostAndPort(split.getHost(), split.getPort()));
+			//jedis = new JedisCluster(jedisClusterNodes);	
+			//keyValueMapIter = jedis.hgetAll("member:" + currentKey).entrySet().iterator();			
 		}
 
-		// This method is called by Mapper¡¯s run method to ensure all key/value pairs are read
-		public boolean nextKeyValue() throws IOException, InterruptedException {
+		// Called by Mapper
+		public boolean nextKeyValue() throws IOException, InterruptedException {			
+			String currentHashKey;
 			
-			if(currentKey < totalKVs){
-				String currentHashKey = "member:" + Integer.toString(currentKey);
-				//System.out.println("CurrentKey = " + currentHashKey);
+			if(!keys.isEmpty()){
+				currentHashKey = keys.get(0);
+				keyValueMapIter = jedisInstance.hgetAll(currentHashKey).entrySet().iterator();
 				
-				keyValueMapIter = jedis.hgetAll(currentHashKey).entrySet().iterator();
 				key.set(currentHashKey);
 				value.set("");
+				
 				while(keyValueMapIter.hasNext()){
 					currentEntry = keyValueMapIter.next();
 					value.set(value.toString() + ',' + currentEntry.getValue());
 				}
 				
-				//System.out.println("CurrentValue = " + value.toString());
+				processedKVs++;
+				keys.remove(currentHashKey);
 				
-				currentKey++;
 				return true;
 			}
+//			
+//			if(currentKey < totalKVs){
+//				String currentHashKey = "member:" + Integer.toString(currentKey);
+//				
+//				try{
+//					exists = jedisInstance.exists(currentHashKey);
+//					System.out.println("nextKeyValue() exists = true");
+//				}catch(JedisMovedDataException e){
+//					exists = false;
+//					System.out.println("nextKeyValue() exists = false");
+//					return true;
+//				}
+//				
+//				if(exists){
+//					keyValueMapIter = jedisInstance.hgetAll(currentHashKey).entrySet().iterator();
+//					key.set(currentHashKey);
+//					value.set("");
+//					while(keyValueMapIter.hasNext()){
+//						currentEntry = keyValueMapIter.next();
+//						value.set(value.toString() + ',' + currentEntry.getValue());
+//					}
+//					processedKVs++;
+//					//return true;
+//				}
+//				
+//				currentKey++;				
+//				return true;
+//			}
 			
 			return false;
-			
 			
 //			if (keyValueMapIter.hasNext()) {
 //				// Get the current entry and set the Text objects to the entry
@@ -195,32 +213,25 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 		public void close() throws IOException {
 			/* nothing to do */
 			//jedis.disconnect();
-			jedis.close();
+			jedisInstance.close();
 		}
 
 	} // end RedisHashRecordReader
 
 	public static class RedisHashInputSplit extends InputSplit implements Writable {
 
-		// Two member variables, the hostname and the hash key (table name)
 		private String host = null;
 		private String port = null;
-		//private String hashKey = null;
 
 		public RedisHashInputSplit() {
-		// Default constructor required for reflection
+			// Default constructor required for reflection
 		}
 
 		public RedisHashInputSplit(String redisHost, String redisPort) {
 			this.host = redisHost;
 			this.port = redisPort;
-			//this.hashKey = hash;
 		}
 
-//		public String getHashKey() {
-//			return this.hashKey;
-//		}
-		
 		public String getHost(){
 			return this.host;
 		}
@@ -240,7 +251,7 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 			out.writeUTF(port);
 		}
 
-		// This gets the size of the split so the framework can sort them by size.  This isn¡¯t that important here, but we could query a Redis instance and get the bytes if we desired
+		// This gets the size of the split so the framework can sort them by size.
 		public long getLength() throws IOException, InterruptedException {
 			return 0;
 		}
