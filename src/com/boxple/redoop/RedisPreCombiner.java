@@ -5,6 +5,8 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapreduce.Mapper;
 
+import redis.clients.jedis.Jedis;
+
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -17,13 +19,19 @@ public class RedisPreCombiner<KEY extends Writable, VALUE extends Writable> {
 	  private int maxCacheCapacity;
 	  private Map < KEY, VALUE > lruCache;
 	  private CombiningFunction < VALUE > combiningFunction;
+	  
+	  private Jedis jedisInstance;
 	 
 	  @SuppressWarnings("rawtypes")
 	  private Mapper.Context context;
 	  
 	  public RedisPreCombiner(int cacheCapacity, CombiningFunction<VALUE> combiningFunction, int initialCapacity, float loadFactor) {
 	    this.combiningFunction = combiningFunction;
-	    this.maxCacheCapacity = cacheCapacity;
+	    this.maxCacheCapacity = cacheCapacity;	    
+
+		jedisInstance = new Jedis("127.0.0.1", 7000);
+		jedisInstance.getClient().setTimeoutInfinite();
+		jedisInstance.connect();
 
 	    lruCache = new LinkedHashMap<KEY, VALUE>(initialCapacity, loadFactor, true) {
 			private static final long serialVersionUID = 1L;
@@ -35,6 +43,7 @@ public class RedisPreCombiner<KEY extends Writable, VALUE extends Writable> {
 		        if (isFull) {
 		          try {
 		            // If the cache is full, emit the eldest key value pair to the reducer, and delete them from cache
+		        	System.out.println("PreCombiner::removeEldestEntry - context.write");
 		            context.write(eldest.getKey(), eldest.getValue());
 		          } catch (IOException ex) {
 		            throw new UncheckedIOException(ex);
@@ -85,6 +94,8 @@ public class RedisPreCombiner<KEY extends Writable, VALUE extends Writable> {
 		    
 		    if (combiningFunction != null) {
 		    	try {
+		    		jedisInstance.set(key.toString(), combiningFunction.combine(lruCache.get(key), value).toString());
+		    		
 			        if (!lruCache.containsKey(key)) {
 			          lruCache.put(key, value);
 			        } else {
@@ -104,7 +115,9 @@ public class RedisPreCombiner<KEY extends Writable, VALUE extends Writable> {
 	  public void flush(Mapper.Context context) throws IOException, InterruptedException {
 	    // Emit the key-value pair from the LRU cache.
 	    if (!lruCache.isEmpty()) {
+	   
 	      for (Map.Entry < KEY, VALUE > item: lruCache.entrySet()) {
+	    	System.out.println("PreCombiner::flush - context.write(" + item.getKey().toString() + "," + item.getValue().toString() + ")");
 	        context.write(item.getKey(), item.getValue());
 	      }
 	    }

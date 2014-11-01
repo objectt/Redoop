@@ -18,6 +18,8 @@ public class RedisReducer extends Reducer<Text, IntWritable, Text, Text> {
         for(IntWritable value: values){
         	keyCount+= value.get();
         }
+        
+        //System.out.println("RedisReducer::reduce key = " + key.toString());
         output.write(key, new Text(Integer.toString(keyCount)));
     }
 }

@@ -1,16 +1,19 @@
 package com.boxple.redoop;
 
 import java.io.IOException;
-import java.util.StringTokenizer;
+//import java.util.StringTokenizer;
 
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 
+import redis.clients.jedis.Jedis;
+
 public class RedisMapper extends Mapper<Text, Text, Text, IntWritable>{
 
 	private final IntWritable one = new IntWritable(1);
 	private Text word = new Text();
+	private Jedis jedisInstance;
 	
 	private final RedisPreCombiner<Text, IntWritable> combiner = new RedisPreCombiner<Text, IntWritable>(
 		new CombiningFunction<IntWritable>() {
@@ -21,21 +24,32 @@ public class RedisMapper extends Mapper<Text, Text, Text, IntWritable>{
 			}
 	});
 	
+    @Override
+    public void setup(Context context) throws IOException,
+            InterruptedException {
+    }
+	
 	@Override
 	public void map(Text key, Text value, Context context) 
 			throws IOException, InterruptedException {
 		
 		String line = value.toString();
-		StringTokenizer itr = new StringTokenizer(line, ",");
+		String[] member = line.split(",");
+		//StringTokenizer itr = new StringTokenizer(line, ",");
 		
-		while (itr.hasMoreTokens()) {
-			word.set(itr.nextToken());
-			//contex.write(word, one);
-			combiner.write(word, one, context);
-		}
+		word.set(member[2]);
+		combiner.write(word, one, context);
+		//context.write(word, one);
 		
-		System.out.println("map - " + key.toString());
-		//contex.write(key, one);
+		word.set(member[3]);
+		combiner.write(word, one, context);
+		//context.write(word, one);
+		
+//		while (itr.hasMoreTokens()) {
+//			word.set(itr.nextToken());
+//			//context.write(word, one);
+//			combiner.write(word, one, context);
+//		}
 	}
 	
 	@Override
