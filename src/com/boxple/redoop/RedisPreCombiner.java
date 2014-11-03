@@ -1,11 +1,13 @@
 package com.boxple.redoop;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapreduce.Mapper;
 
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.exceptions.JedisMovedDataException;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -20,6 +22,8 @@ public class RedisPreCombiner<KEY extends Writable, VALUE extends Writable> {
 	  private Map < KEY, VALUE > lruCache;
 	  private CombiningFunction < VALUE > combiningFunction;
 	  
+	  private String keyPrefix = "MR:IR:";
+	  private VALUE prevValue;
 	  private Jedis jedisInstance;
 	 
 	  @SuppressWarnings("rawtypes")
@@ -80,31 +84,32 @@ public class RedisPreCombiner<KEY extends Writable, VALUE extends Writable> {
 
 	  @SuppressWarnings({ "rawtypes", "unchecked" })
 	  public void write(KEY key, VALUE value, Mapper.Context context) throws InterruptedException, IOException {
-		    /**
-		     *  In Hadoop, context.write(key, value) should have a new copy of key and value in context.write().
-		     *  This is because lots of time, people use private final static LongWritable one = new LongWritable(1);
-		     *  in the mapper class as global variable, and we don't want to reference to it in the LRU cache
-		     *  which may cause unexpected result. As a result, we will clone the key and value objects.
-		     * */
-		  
-			Configuration conf = context.getConfiguration();
+			
+		    Configuration conf = context.getConfiguration();
+			this.context = context;
+			
 			key = WritableUtils.clone(key, conf);
 			value = WritableUtils.clone(value, conf);
-			this.context = context;
 		    
 		    if (combiningFunction != null) {
 		    	try {
-		    		jedisInstance.set(key.toString(), combiningFunction.combine(lruCache.get(key), value).toString());
+		    		this.prevValue = (VALUE) new IntWritable(Integer.parseInt(jedisInstance.get(keyPrefix + key.toString())));
+		    		jedisInstance.set(keyPrefix + key.toString(), combiningFunction.combine(prevValue, value).toString());
+		    		lruCache.put(key, value);
 		    		
-			        if (!lruCache.containsKey(key)) {
-			          lruCache.put(key, value);
-			        } else {
-			          lruCache.put(key, combiningFunction.combine(lruCache.get(key), value));
-			        }
+		    		System.out.println(keyPrefix + key.toString());
+		    		
+			        //if (!lruCache.containsKey(key)) {
+			        //  lruCache.put(key, value);
+			        //} else {
+			        //  lruCache.put(key, combiningFunction.combine(lruCache.get(key), value));
+			        //}
 		        } catch (UncheckedIOException ex) {
 		        	throw new IOException(ex);
 	        	} catch (UncheckedInterruptedException ex) {
 	        		throw new InterruptedException(ex.toString());
+	    		} catch (JedisMovedDataException ex){
+	    			
 	    		}
 	    	} else {
 	    		context.write(key, value);
@@ -113,13 +118,13 @@ public class RedisPreCombiner<KEY extends Writable, VALUE extends Writable> {
 
 	  @SuppressWarnings({ "rawtypes", "unchecked" })
 	  public void flush(Mapper.Context context) throws IOException, InterruptedException {
-	    // Emit the key-value pair from the LRU cache.
 	    if (!lruCache.isEmpty()) {
-	   
-	      for (Map.Entry < KEY, VALUE > item: lruCache.entrySet()) {
-	    	System.out.println("PreCombiner::flush - context.write(" + item.getKey().toString() + "," + item.getValue().toString() + ")");
-	        context.write(item.getKey(), item.getValue());
-	      }
+	    	for (Map.Entry < KEY, VALUE > item: lruCache.entrySet()) {
+	    		System.out.println("PreCombiner::flush - context.write(" + item.getKey().toString() + "," + item.getValue().toString() + ")");
+	    		
+	    		context.write(item.getKey(), new IntWritable(Integer.parseInt(jedisInstance.get(keyPrefix + item.getKey()))));
+	    		//context.write(item.getKey(), item.getValue());
+	    	}
 	    }
 	    lruCache.clear();
 	  }

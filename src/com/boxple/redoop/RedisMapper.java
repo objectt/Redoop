@@ -7,13 +7,13 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 
-import redis.clients.jedis.Jedis;
+//import redis.clients.jedis.Jedis;
 
 public class RedisMapper extends Mapper<Text, Text, Text, IntWritable>{
 
 	private final IntWritable one = new IntWritable(1);
 	private Text word = new Text();
-	private Jedis jedisInstance;
+	//private Jedis jedisInstance;
 	
 	private final RedisPreCombiner<Text, IntWritable> combiner = new RedisPreCombiner<Text, IntWritable>(
 		new CombiningFunction<IntWritable>() {
