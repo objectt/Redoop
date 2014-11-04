@@ -222,6 +222,7 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 				
 				while(!(jedisInstance.type(currentHashKey)).equalsIgnoreCase("hash")){
 					keys.remove(currentHashKey);
+					jedisInstance.del(currentHashKey);
 					
 					if(!keys.isEmpty())
 						currentHashKey = keys.get(0);

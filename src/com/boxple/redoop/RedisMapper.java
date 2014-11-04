@@ -7,6 +7,8 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 
+import com.boxple.redoop.RedisHashInputFormat.RedisHashInputSplit;
+
 //import redis.clients.jedis.Jedis;
 
 public class RedisMapper extends Mapper<Text, Text, Text, IntWritable>{
@@ -26,7 +28,13 @@ public class RedisMapper extends Mapper<Text, Text, Text, IntWritable>{
 	
     @Override
     public void setup(Context context) throws IOException,
-            InterruptedException {
+            InterruptedException {   	
+    	
+    	RedisHashInputSplit split = (RedisHashInputSplit) context.getInputSplit();
+    	int port = split.getPort();
+    	
+    	System.out.println(port);
+    	combiner.setPort(port);
     }
 	
 	@Override
@@ -39,11 +47,15 @@ public class RedisMapper extends Mapper<Text, Text, Text, IntWritable>{
 		
 		word.set(member[2]);
 		combiner.write(word, one, context);
-		//context.write(word, one);
+		//context.write(word, one);	
+		
+		System.out.println("MAPPER::("+ word.toString() + ",1)");
 		
 		word.set(member[3]);
 		combiner.write(word, one, context);
 		//context.write(word, one);
+		
+		System.out.println("MAPPER::("+ word.toString() + ",1)");
 		
 //		while (itr.hasMoreTokens()) {
 //			word.set(itr.nextToken());

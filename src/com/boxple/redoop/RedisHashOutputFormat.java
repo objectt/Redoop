@@ -1,9 +1,9 @@
 package com.boxple.redoop;
 
 import java.io.IOException;
-import java.util.HashMap;
+//import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
+//import java.util.Map;
 import java.util.Set;
 
 //import org.apache.commons.logging.Log;
@@ -59,11 +59,10 @@ public class RedisHashOutputFormat extends OutputFormat<Text, Text> {
 		}
 
 		public void write(Text key, Text value) throws IOException, InterruptedException {
-			Map<String, String> hvalue = new HashMap<String, String>();			
-			hvalue.put(key.toString(), value.toString());
+			//Map<String, String> hvalue = new HashMap<String, String>();			
+			//hvalue.put(key.toString(), value.toString());
 			
-			System.out.println("key = " + key.toString());
-			System.out.println("value = " + value.toString());
+			System.out.println("REDUCER::(" + key.toString() + ", " + value.toString() + ")");
 			
 			jedisCluster.set(mrOutputKey + key.toString(), value.toString());
 			//jedisCluster.hset(mrOutputKey, key.toString(), value.toString());
