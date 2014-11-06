@@ -154,12 +154,16 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 	// Ran by each container
 	public static class RedisHashRecordReader extends RecordReader<Text, Text> {
 		
-		private Iterator<Entry<String, String>> keyValueMapIter = null;		
-		private Text key = new Text(), value = new Text();
-		private int processedKVs = 0, totalKVs = 0;
-		private Entry<String, String> currentEntry = null;
 		private Jedis jedisInstance;
+		private long processedKVs = 0, totalKVs = 0;
+		
+		private Iterator<Entry<String, String>> keyValueMapIter = null;		
+		private Text key = new Text(), value = new Text();		
+		private Entry<String, String> currentEntry = null;		
 		private List<String> keys = new ArrayList<String>();
+		
+		private ScanParams params = new ScanParams();
+		private int cursor= 0;
 
 		// Ran by each Mapper once
 		// Initialize is called by the framework and given an InputSplit to process
@@ -172,34 +176,35 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 			
 			LOG.info("RedisHashRecordReader::initialize");
 			LOG.info("Split.addr = " + split.getHost() + ":" + split.getPort());
-			LOG.info("My IP = " + InetAddress.getLocalHost().getHostAddress());
+			LOG.info("Container IP = " + InetAddress.getLocalHost().getHostAddress());
 			
 			jedisInstance = new Jedis(split.getHost(), split.getPort());
 			jedisInstance.getClient().setTimeoutInfinite();
 			jedisInstance.connect();
 			
-			ScanParams params = new ScanParams();
-			params.count(1000);
-			
-			// Get a list of keys
-			// **** Possible bottleneck spot
-			// Should divide 
-			ScanResult<String> scanResult = jedisInstance.scan(0);
-            List<String> result = scanResult.getResult();
-            int cursor = scanResult.getCursor();
-            keys.addAll(result);
+			params.count(1);
+			cursor = 0;
+			totalKVs = jedisInstance.dbSize();
 
-            while(cursor > 0 && keys.size() < 100000){                    
-                    //scanResult = jedisInstance.scan(cursor);
-                    scanResult = jedisInstance.scan(cursor, params);
-                    result = scanResult.getResult();
-                    keys.addAll(result);
-                    cursor = scanResult.getCursor();
-            }
-            
-            totalKVs = keys.size();
-            result.clear();
-            //System.out.println("totalKVs = " + totalKVs);
+//			ScanParams params = new ScanParams();
+//			params.count(1000);
+//			
+//			// Retrieve a list of keys
+//			ScanResult<String> scanResult = jedisInstance.scan(0);
+//            List<String> result = scanResult.getResult();
+//            int cursor = scanResult.getCursor();
+//            keys.addAll(result);
+//
+//            //while(cursor > 0 && keys.size() < 1000000){
+//            while(cursor > 0){
+//                    scanResult = jedisInstance.scan(cursor, params);
+//                    result = scanResult.getResult();
+//                    keys.addAll(result);
+//                    cursor = scanResult.getCursor();
+//            }
+//            
+//            totalKVs = keys.size();
+//            result.clear();
 			
 			// Get the host location from the InputSplit
 			//String host = split.getLocations()[0];
@@ -211,7 +216,7 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 			//keyValueMapIter = jedis.hgetAll("member:" + currentKey).entrySet().iterator();			
 		}
 
-		// Called by Mapper
+		// Repeatedly called by Mapper
 		// Can be improved by processing non-hash records
 		public boolean nextKeyValue() throws IOException, InterruptedException {			
 			String currentHashKey;
@@ -220,15 +225,16 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 				currentHashKey = keys.get(0);
 				//System.out.println("nextKeyValue() = " + currentHashKey);
 				
+				//processedKVs++;
 				while(!(jedisInstance.type(currentHashKey)).equalsIgnoreCase("hash")){
 					keys.remove(currentHashKey);
-					jedisInstance.del(currentHashKey);
+					//jedisInstance.del(currentHashKey);
+					processedKVs++;
 					
 					if(!keys.isEmpty())
 						currentHashKey = keys.get(0);
 					else
 						return false;
-					//System.out.println("### nextKeyValue() = " + currentHashKey);
 				}
 				 				
 				keyValueMapIter = jedisInstance.hgetAll(currentHashKey).entrySet().iterator();				
@@ -258,7 +264,6 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 		}
 
 		public float getProgress() throws IOException, InterruptedException {
-			//System.out.println("RedisHashRecordReader::getProgress");
 			return processedKVs / totalKVs;
 		}
 

@@ -1,27 +1,24 @@
 package com.boxple.redoop;
 
-import org.apache.hadoop.conf.Configuration;
+//import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapreduce.Mapper;
 
-import redis.clients.jedis.HostAndPort;
+//import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisCluster;
-//import redis.clients.jedis.exceptions.JedisMovedDataException;
+//import redis.clients.jedis.JedisCluster;
 
 import java.io.IOException;
-//import java.util.LinkedHashMap;
-//import java.util.Map;
-import java.util.HashSet;
-import java.util.Set;
+//import java.util.HashSet;
+//import java.util.Set;
 
 public class RedisPreCombiner<KEY extends Writable, VALUE extends Writable> {
-	  private static final int DEFAULT_CAPACITY = 8388608;
-	  private static final int DEFAULT_INITIAL_CAPACITY = 65536;
-	  private static final float DEFAULT_LOAD_FACTOR = .75F;
+	  //private static final int DEFAULT_CAPACITY = 8388608;
+	  //private static final int DEFAULT_INITIAL_CAPACITY = 65536;
+	  //private static final float DEFAULT_LOAD_FACTOR = .75F;	  
 	  //private int maxCacheCapacity;
 	  //private Map < KEY, VALUE > lruCache;
 	  
@@ -32,17 +29,16 @@ public class RedisPreCombiner<KEY extends Writable, VALUE extends Writable> {
 	  private String tempValue = null;
 	  
 	  private Jedis jedisInstance;
-	  private JedisCluster jedisCluster;
+	  //private JedisCluster jedisCluster;
 	  
 	  private Text outputKey = new Text();
 	  private IntWritable outputValue = new IntWritable();
-	  
-	  public RedisPreCombiner(int cacheCapacity, CombiningFunction<VALUE> combiningFunction, int initialCapacity, float loadFactor) {
+
+	  //public RedisPreCombiner(int cacheCapacity, CombiningFunction<VALUE> combiningFunction, int initialCapacity, float loadFactor) {	  
+	  public RedisPreCombiner(CombiningFunction<VALUE> combiningFunction){
 	    this.combiningFunction = combiningFunction;
 	    //this.maxCacheCapacity = cacheCapacity;	    
 
-
-		// Not USED!
 //	    lruCache = new LinkedHashMap<KEY, VALUE>(initialCapacity, loadFactor, true) {
 //			private static final long serialVersionUID = 1L;
 //
@@ -66,73 +62,73 @@ public class RedisPreCombiner<KEY extends Writable, VALUE extends Writable> {
 //	    };
 	  }
 	  
-	  // Initial Constructor
 	  public RedisPreCombiner() {
-	    this(DEFAULT_CAPACITY, null, DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR);
+		  //this(DEFAULT_CAPACITY, null, DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR);
+		  this(null);
 	  }
+//	  
+//	  public RedisPreCombiner(int cacheCapacity, CombiningFunction < VALUE > combiningFunction) {
+//	    this(cacheCapacity, combiningFunction, 512, .75F);
+//	  }
+//	  
+//	  public RedisPreCombiner(int cacheCapacity) {
+//	    this(cacheCapacity, null, DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR);
+//	  }
+//
+//	  public RedisPreCombiner(CombiningFunction < VALUE > combiningFunction) {
+//	    this(DEFAULT_CAPACITY, combiningFunction, 512, .75F);
+//	  }
 	  
-	  public RedisPreCombiner(int cacheCapacity, CombiningFunction < VALUE > combiningFunction) {
-	    this(cacheCapacity, combiningFunction, 512, .75F);
-	  }
+//	  public void setCombiningFunction(CombiningFunction < VALUE > combiningFunction) {
+//	    this.combiningFunction = combiningFunction;
+//	  } 
 	  
-	  public RedisPreCombiner(int cacheCapacity) {
-	    this(cacheCapacity, null, DEFAULT_INITIAL_CAPACITY, DEFAULT_LOAD_FACTOR);
-	  }
-
-	  public RedisPreCombiner(CombiningFunction < VALUE > combiningFunction) {
-	    this(DEFAULT_CAPACITY, combiningFunction, 512, .75F);
-	  }
- 
-	  public void setPort(int splitPort){
-		//this.port = splitPort;
-		  
-	    // Redis Instance
+	  // Initliaze Redis connection
+	  public void setPort(int splitPort){		  
+		// Redis Instance
 		jedisInstance = new Jedis("127.0.0.1", splitPort);
 		jedisInstance.getClient().setTimeoutInfinite();
 		jedisInstance.connect();
 		
 		// Redis Cluster
-		Set<HostAndPort> jedisClusterNodes = new HashSet<HostAndPort>();
-		jedisClusterNodes.add(new HostAndPort("127.0.0.1", splitPort));
-		jedisCluster = new JedisCluster(jedisClusterNodes);
+		//Set<HostAndPort> jedisClusterNodes = new HashSet<HostAndPort>();
+		//jedisClusterNodes.add(new HostAndPort("127.0.0.1", splitPort));
+		//jedisCluster = new JedisCluster(jedisClusterNodes);
 	  }
-	  
-//	  public void setCombiningFunction(CombiningFunction < VALUE > combiningFunction) {
-//	    this.combiningFunction = combiningFunction;
-//	  }
 
 	  @SuppressWarnings({ "rawtypes", "unchecked" })
-	  public void write(KEY key, VALUE value, Mapper.Context context) throws InterruptedException, IOException {
-			//this.context = context;			
-		    Configuration conf = context.getConfiguration();
-			
-			key = WritableUtils.clone(key, conf);
-			value = WritableUtils.clone(value, conf);
-			
-			System.out.println("COMBINER1::(" + key.toString() + ", " + value.toString() + ")");
-			
-			// Store intermediate result in local Redis
-		    if (combiningFunction != null) {
-		    	try {
-		    		tempValue = jedisCluster.get(keyPrefix + key.toString());
-		    		prevValue = (VALUE) new IntWritable(Integer.parseInt(tempValue));
-		    		
-		    		System.out.println("COMBINER2::(" + keyPrefix + key.toString() + ", " + tempValue + ")");		    		
-		    		
-		    		jedisCluster.set(keyPrefix + key.toString(), combiningFunction.combine(prevValue, value).toString());
-		    		
-			        //if (!lruCache.containsKey(key)) {
-			        //  lruCache.put(key, value);
-			        //} else {
-			        //  lruCache.put(key, combiningFunction.combine(lruCache.get(key), value));
-			        //}
-		    	} catch(Exception ex){
-		    		jedisCluster.set(keyPrefix + key.toString(), value.toString());
-		    		//jedisInstance.set(keyPrefix + key.toString(), value.toString());
-		    	}
-	    	} else {
-	    		context.write(key, value);
+	  public void write(KEY key, VALUE value, Mapper.Context context) 
+			  throws InterruptedException, IOException {
+		  			
+		//Configuration conf = context.getConfiguration();		
+		key = WritableUtils.clone(key, context.getConfiguration());
+		value = WritableUtils.clone(value, context.getConfiguration());
+		
+		System.out.println("COMBINER1::(" + key.toString() + ", " + value.toString() + ")");
+		
+		// Store intermediate result in local Redis
+		if (combiningFunction != null) {
+			try {
+				tempValue = jedisInstance.get(keyPrefix + key.toString());
+				tempValue = (tempValue == null)? "0" : tempValue;
+				prevValue = (VALUE) new IntWritable(Integer.parseInt(tempValue));
+				
+				System.out.println("COMBINER2::(" + keyPrefix + key.toString() + ", " + tempValue + ")");		    		
+				
+				jedisInstance.set(keyPrefix + key.toString(), combiningFunction.combine(prevValue, value).toString());
+				
+		        //if (!lruCache.containsKey(key)) {
+		        //  lruCache.put(key, value);
+		        //} else {
+		        //  lruCache.put(key, combiningFunction.combine(lruCache.get(key), value));
+		        //}
+			} catch(Exception ex){
+				jedisInstance.set(keyPrefix + key.toString(), value.toString());
+				//jedisInstance.set(keyPrefix + key.toString(), value.toString());
 			}
+		} else {
+			context.write(key, value);
+		}
 	  }
 
 	  @SuppressWarnings({ "rawtypes", "unchecked" })
