@@ -50,13 +50,13 @@ public class RedisMapper extends Mapper<Text, Text, Text, IntWritable>{
 		combiner.write(word, one, context);
 		//context.write(word, one);	
 		
-		System.out.println("MAPPER::("+ word.toString() + ",1)");
+		//System.out.println("MAPPER::("+ word.toString() + ",1)");
 		
 		word.set(member[3]);
 		combiner.write(word, one, context);
 		//context.write(word, one);
 		
-		System.out.println("MAPPER::("+ word.toString() + ",1)");
+		//System.out.println("MAPPER::("+ word.toString() + ",1)");
 		
 //		while (itr.hasMoreTokens()) {
 //			word.set(itr.nextToken());

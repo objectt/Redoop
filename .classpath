@@ -10,5 +10,6 @@
 	<classpathentry kind="lib" path="D:/Dev/hadoop-jar/jedis-2.6.0.jar"/>
 	<classpathentry kind="lib" path="D:/Dev/hadoop-jar/common/lib/log4j-1.2.17.jar"/>
 	<classpathentry kind="lib" path="D:/Dev/redoop/jar/commons-logging-1.1.3.jar"/>
+	<classpathentry kind="lib" path="C:/Users/ZOMBIE/Downloads/json-simple-1.1.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

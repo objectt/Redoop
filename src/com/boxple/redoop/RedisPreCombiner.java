@@ -104,7 +104,7 @@ public class RedisPreCombiner<KEY extends Writable, VALUE extends Writable> {
 		key = WritableUtils.clone(key, context.getConfiguration());
 		value = WritableUtils.clone(value, context.getConfiguration());
 		
-		System.out.println("COMBINER1::(" + key.toString() + ", " + value.toString() + ")");
+		//System.out.println("COMBINER1::(" + key.toString() + ", " + value.toString() + ")");
 		
 		// Store intermediate result in local Redis
 		if (combiningFunction != null) {
@@ -113,7 +113,7 @@ public class RedisPreCombiner<KEY extends Writable, VALUE extends Writable> {
 				tempValue = (tempValue == null)? "0" : tempValue;
 				prevValue = (VALUE) new IntWritable(Integer.parseInt(tempValue));
 				
-				System.out.println("COMBINER2::(" + keyPrefix + key.toString() + ", " + tempValue + ")");		    		
+				//System.out.println("COMBINER2::(" + keyPrefix + key.toString() + ", " + tempValue + ")");		    		
 				
 				jedisInstance.set(keyPrefix + key.toString(), combiningFunction.combine(prevValue, value).toString());
 				

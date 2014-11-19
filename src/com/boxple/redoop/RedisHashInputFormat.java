@@ -131,6 +131,7 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 		setConf(job.getConfiguration());
 				
 		try{
+			// Retrieve cluster nodes
 			List<InputSplit> splits = new ArrayList<InputSplit>();
 			for (String hosts : jedisCluster.getClusterNodes().keySet()){
 				String[] uri = hosts.split(":");			
@@ -160,10 +161,12 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 		private Iterator<Entry<String, String>> keyValueMapIter = null;		
 		private Text key = new Text(), value = new Text();		
 		private Entry<String, String> currentEntry = null;		
-		private List<String> keys = new ArrayList<String>();
+		//private List<String> keys = new ArrayList<String>();
 		
 		private ScanParams params = new ScanParams();
+		private ScanResult<String> scanResult;
 		private int cursor= 0;
+		private String currentHashKey;
 
 		// Ran by each Mapper once
 		// Initialize is called by the framework and given an InputSplit to process
@@ -183,9 +186,16 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 			jedisInstance.connect();
 			
 			params.count(1);
-			cursor = 0;
 			totalKVs = jedisInstance.dbSize();
+			cursor = 0;			
+			
+			scanResult = jedisInstance.scan(cursor, params);
+			cursor = scanResult.getCursor();
+			currentHashKey = scanResult.getResult().get(0);
 
+			//LOG.info(currentHashKey);
+			System.out.println("totalKVs = " + totalKVs);
+			
 //			ScanParams params = new ScanParams();
 //			params.count(1000);
 //			
@@ -218,41 +228,86 @@ public class RedisHashInputFormat extends InputFormat<Text, Text> {
 
 		// Repeatedly called by Mapper
 		// Can be improved by processing non-hash records
-		public boolean nextKeyValue() throws IOException, InterruptedException {			
-			String currentHashKey;
+		@SuppressWarnings("deprecation")
+		public boolean nextKeyValue() throws IOException, InterruptedException {
 			
-			if(keys != null && !keys.isEmpty() && keys.size() > 0){
-				currentHashKey = keys.get(0);
-				//System.out.println("nextKeyValue() = " + currentHashKey);
+			// False if no more key
+			if(cursor <= 0) return false;
+			
+			// Ignore non-hash record
+			while(!(jedisInstance.type(currentHashKey)).equalsIgnoreCase("hash")){				
+				if(cursor <= 0) return false;
 				
-				//processedKVs++;
-				while(!(jedisInstance.type(currentHashKey)).equalsIgnoreCase("hash")){
-					keys.remove(currentHashKey);
-					//jedisInstance.del(currentHashKey);
-					processedKVs++;
-					
-					if(!keys.isEmpty())
-						currentHashKey = keys.get(0);
-					else
-						return false;
-				}
-				 				
-				keyValueMapIter = jedisInstance.hgetAll(currentHashKey).entrySet().iterator();				
-				key.set(currentHashKey);
-				value.set("");
-				
-				while(keyValueMapIter.hasNext()){
-					currentEntry = keyValueMapIter.next();
-					value.set(value.toString() + ',' + currentEntry.getValue());
-				}
-				
+				scanResult = jedisInstance.scan(cursor, params);			
+				currentHashKey = scanResult.getResult().get(0);
+				cursor = scanResult.getCursor();					// Next Cursor
 				processedKVs++;
-				keys.remove(currentHashKey);
-				
-				return true;
 			}
 			
-			return false;
+			// Get (K,V)
+			keyValueMapIter = jedisInstance.hgetAll(currentHashKey).entrySet().iterator();
+			key.set(currentHashKey);
+			value.set("");
+			
+			while(keyValueMapIter.hasNext()){
+				currentEntry = keyValueMapIter.next();
+				value.set(value.toString() + ',' + currentEntry.getValue());
+			}
+			//System.out.println("mapper::getNextKey().currentHashKey = " + currentHashKey);	
+			//LOG.info("mapper::getNextKey().currentHashKey = " + currentHashKey);
+			System.out.println("cursor = " + cursor);
+			
+			// Get Next Key if exists
+			if(cursor > 0){
+				try{
+					scanResult = jedisInstance.scan(cursor, params);
+					cursor = scanResult.getCursor();
+					if(cursor > 0)
+						currentHashKey = scanResult.getResult().get(0);
+				}catch(Exception ex){
+					cursor = 0;
+					//System.out.println("exception cursor = " + cursor);
+				}
+			}
+			processedKVs++;
+			
+			System.out.println("processedKVs = " + processedKVs);
+			
+			return true;
+			
+			
+//			if(keys != null && !keys.isEmpty() && keys.size() > 0){
+//				currentHashKey = keys.get(0);
+//				//System.out.println("nextKeyValue() = " + currentHashKey);
+//				
+//				//processedKVs++;
+//				while(!(jedisInstance.type(currentHashKey)).equalsIgnoreCase("hash")){
+//					keys.remove(currentHashKey);
+//					//jedisInstance.del(currentHashKey);
+//					processedKVs++;
+//					
+//					if(!keys.isEmpty())
+//						currentHashKey = keys.get(0);
+//					else
+//						return false;
+//				}
+//				 				
+//				keyValueMapIter = jedisInstance.hgetAll(currentHashKey).entrySet().iterator();				
+//				key.set(currentHashKey);
+//				value.set("");
+//				
+//				while(keyValueMapIter.hasNext()){
+//					currentEntry = keyValueMapIter.next();
+//					value.set(value.toString() + ',' + currentEntry.getValue());
+//				}
+//				
+//				processedKVs++;
+//				keys.remove(currentHashKey);
+//				
+//				return true;
+//			}
+//			
+//			return false;
 		}
 
 		public Text getCurrentKey() throws IOException, InterruptedException {
