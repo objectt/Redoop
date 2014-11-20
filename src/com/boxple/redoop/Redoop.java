@@ -8,17 +8,12 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-//import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
-import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
-//import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
-import org.apache.hadoop.util.ToolRunner;	
-
-//import com.boxple.redoop.Twitter.TwitMapper;
-//import com.boxple.redoop.Twitter.TwitReducer;
+import org.apache.hadoop.util.ToolRunner;
 
 
 public class Redoop extends Configured implements Tool{
@@ -60,6 +55,7 @@ public class Redoop extends Configured implements Tool{
         // TwitRanker 
         FileInputFormat.addInputPath(job, new Path(args[1]));
         FileOutputFormat.setOutputPath(job, new Path(args[2]));
+        TextOutputFormat.setOutputPath(job, new Path(args[2]));
         
         job.setMapperClass(Twitter.TwitMapper.class);        
         job.setMapOutputKeyClass(DateWordPair.class);
@@ -67,13 +63,15 @@ public class Redoop extends Configured implements Tool{
         
         //job.setInputFormatClass(TextInputFormat.class);
         //job.setOutputFormatClass(TextOutputFormat.class);
-        job.setOutputFormatClass(NullOutputFormat.class);
+        //job.setOutputFormatClass(NullOutputFormat.class);
         
         job.setReducerClass(Twitter.TwitReducer.class);
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(IntWritable.class);
         
-        MultipleOutputs.addNamedOutput(job, "twit", TextOutputFormat.class, IntWritable.class, Text.class);
+        LazyOutputFormat.setOutputFormatClass(job, TextOutputFormat.class); 
+        MultipleOutputs.addNamedOutput(job, "twitByDate", TextOutputFormat.class, Text.class, IntWritable.class);
+        MultipleOutputs.setCountersEnabled(job, true);
         
         
 //        job.setMapperClass(HadoopMapper.class);

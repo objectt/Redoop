@@ -95,7 +95,6 @@ public class Twitter {
 
 	// REDUCER
 	public static class TwitReducer extends Reducer<DateWordPair, IntWritable, Text, IntWritable> {
-	//public static class TwitReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
 
 		private MultipleOutputs<Text, IntWritable> multipleOutputs;
 		private IntWritable outputSum = new IntWritable();
@@ -106,30 +105,20 @@ public class Twitter {
 			multipleOutputs = new MultipleOutputs<Text, IntWritable>(context);
 		}
 
-	    //public void reduce(DateWordPair key, Iterator<IntWritable> values, OutputCollector<IntWritable, Text> output)
 		@Override
 	    public void reduce(DateWordPair key, Iterable<IntWritable> values, Context output)
 			throws IOException, InterruptedException {
 			
-			//OutputCollector collector = multipleOutputs.getCollector("count", (key.getFirst()).toString().replace("/",""));
-
+			System.out.println("reducer = " + key.getSecond());
 			int sum = 0;
 			for(IntWritable value : values){
 				sum += value.get();
-			}
-			
-			//String dateStr = key.toString().split(",")[0];
+			}			
 			outputSum.set(sum);
-			//outputTxt.set(key.toString());
 			
-			//output.write(key, outputSum);
-			multipleOutputs.write("twit", key.getSecond(), outputSum, (key.getFirst()).toString());
-			//multipleOutputs.write(dateStr, key, outputSum);
-			
-			//multipleOutputs.write("twit", outputSum, key.getSecond(), key.getFirst().toString());
-			//collector.collect(new IntWritable(sum), key.getSecond());
-			//collector.collect(key.getSecond(), NullWritable.get());
-			//collector.collect(key.getSecond(), new IntWritable(sum));
+			//output.write(key.getSecond(), outputSum);
+			if(sum > 5)
+				multipleOutputs.write("twitByDate", key.getSecond(), outputSum, (key.getFirst()).toString());
 		}
 
 		@Override
