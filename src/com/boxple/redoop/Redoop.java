@@ -34,7 +34,7 @@ public class Redoop extends Configured implements Tool{
         //conf.set("mapreduce.redis.port", "7000");
   
         Job job = Job.getInstance(conf);
-        job.setJobName("Redoop Word Counter");
+        job.setJobName("Redoop");
         job.setJarByClass(Redoop.class);
         
         // Redis
@@ -73,6 +73,7 @@ public class Redoop extends Configured implements Tool{
         MultipleOutputs.addNamedOutput(job, "twitByDate", TextOutputFormat.class, Text.class, IntWritable.class);
         MultipleOutputs.setCountersEnabled(job, true);
         
+//		job.setCombinerClass(Combiner.class);
         
 //        job.setMapperClass(HadoopMapper.class);
 //        job.setReducerClass(HadoopReducer.class);
@@ -81,7 +82,7 @@ public class Redoop extends Configured implements Tool{
 //        job.setMapOutputKeyClass(Text.class);
 //        job.setMapOutputValueClass(IntWritable.class);     
         
-        job.setNumReduceTasks(1);
+        //job.setNumReduceTasks(1);
         
         return job.waitForCompletion(true) ? 0 : 1;
 	}

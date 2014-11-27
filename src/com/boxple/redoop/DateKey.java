@@ -91,4 +91,23 @@ public class DateKey implements WritableComparable<DateKey>{
 
 		return result;
 	}
+	
+	@Override
+	public boolean equals(Object obj){
+		if(obj == null)
+			return false;
+        if (getClass() != obj.getClass())
+            return false;
+        
+		final DateKey other = (DateKey) obj;
+		if(other.compareTo(this) != 0)
+			return false;
+		
+		return true;
+	}
+	
+    @Override
+    public int hashCode() {
+    	return Integer.parseInt(toString());
+    }
 }

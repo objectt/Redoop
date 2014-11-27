@@ -8,11 +8,11 @@ import java.util.Date;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
-//import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
-import org.json.simple.*;
+
+import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
 public class Twitter {
@@ -20,15 +20,41 @@ public class Twitter {
 	// MAPPER
 	public static class TwitMapper extends Mapper<LongWritable, Text, DateWordPair, IntWritable>{
 	
-		private JSONParser parser = new JSONParser();		
+		private JSONParser parser = new JSONParser();
+		private StringTokenizer itr;
+		
 		private Text wordTxt = new Text();
 		private IntWritable one = new IntWritable(1);
 		private DateKey dateKey = new DateKey();
 		private DateWordPair dateWordPair = new DateWordPair();
-		//private Text dateWordPair = new Text();
-		StringTokenizer itr;
 
-		//public void map(LongWritable key, Text value, OutputCollector<DateWordPair, IntWritable> output)
+//		private final RedisPreCombiner<DateWordPair, IntWritable> combiner = new RedisPreCombiner<DateWordPair, IntWritable>(
+//				new CombiningFunction<IntWritable>() {
+//					@Override
+//					public IntWritable combine(IntWritable value1, IntWritable value2) {
+//						value1.set(value1.get() + value2.get());
+//						return value1;
+//					}
+//		});
+
+		private final CombinerPre<DateWordPair, IntWritable> IMCombiner = new CombinerPre<DateWordPair, IntWritable>(
+		new CombiningFunction<IntWritable>() {
+			@Override
+			public IntWritable combine(IntWritable value1, IntWritable value2) {
+				value1.set(value1.get() + value2.get());
+				return value1;
+			}
+		});
+		
+	   @Override
+	    public void setup(Context context) throws IOException,
+	            InterruptedException {   	
+	    	
+	    	//int port = 7003;	// Default combier port
+	    	//combiner.setPort(port);
+		    IMCombiner.setContext(context);
+	    }
+		   
 		@Override
 		public void map(LongWritable key, Text value, Context context) 
 				throws IOException, InterruptedException {
@@ -70,25 +96,24 @@ public class Twitter {
 
 				dateWordPair.setDate(dateKey);		
 				//if(oriTweetId.isNull()) reporter.incrCounter(TwitRankerCounters.total_retweets, 1);
-				//reporter.incrCounter("TweetsByDate", datekey.toString(), 1);
-				
-				//dateTxt.set(dateStr);
-				//msgTxt.set(msgStr);
-				//context.write(dateTxt, msgTxt);
-				
+								
 				itr = new StringTokenizer(msgStr);
 				while (itr.hasMoreTokens()) {
 					wordTxt.set(itr.nextToken());
 					dateWordPair.setWord(wordTxt);
-					//dateWordPair.set(dateKey.toString() + "," + wordTxt);
-
-					//System.out.println("wordTxt = " + wordTxt);
-					//output.collect(dateWordPair, one);
-					context.write(dateWordPair, one);
+					
+					//context.write(dateWordPair, one);
+					IMCombiner.write(dateWordPair, one, context);
 				}								
 			}catch(Exception e){
-				System.out.println(e.toString());
+				//System.out.println(e.toString());
 			}
+		}
+		
+		@Override
+		protected void cleanup(Context context) throws IOException, InterruptedException {
+			//combiner.close();
+			IMCombiner.flush(context);
 		}
 	}
 	
@@ -98,7 +123,6 @@ public class Twitter {
 
 		private MultipleOutputs<Text, IntWritable> multipleOutputs;
 		private IntWritable outputSum = new IntWritable();
-		//private Text outputTxt = new Text();
 
 		@Override
 		public void setup(Context context) throws IOException, InterruptedException {
@@ -109,7 +133,7 @@ public class Twitter {
 	    public void reduce(DateWordPair key, Iterable<IntWritable> values, Context output)
 			throws IOException, InterruptedException {
 			
-			System.out.println("reducer = " + key.getSecond());
+			//System.out.println("reducer = " + key.getSecond());
 			int sum = 0;
 			for(IntWritable value : values){
 				sum += value.get();
