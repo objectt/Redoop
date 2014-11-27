@@ -36,23 +36,37 @@ public class Twitter {
 //						return value1;
 //					}
 //		});
-
-		private final CombinerPre<DateWordPair, IntWritable> IMCombiner = new CombinerPre<DateWordPair, IntWritable>(
+		
+		// In-Node Combiner Variables
+		private int port = 7003;
+		private int minThreshold = 5;
+		
+		private final CombinerNode<DateWordPair, IntWritable> INCCombiner = new CombinerNode<DateWordPair, IntWritable>(
 		new CombiningFunction<IntWritable>() {
 			@Override
 			public IntWritable combine(IntWritable value1, IntWritable value2) {
 				value1.set(value1.get() + value2.get());
 				return value1;
 			}
-		});
+		}, port, minThreshold);
+
+//		private final CombinerPre<DateWordPair, IntWritable> IMCCombiner = new CombinerPre<DateWordPair, IntWritable>(
+//		new CombiningFunction<IntWritable>() {
+//			@Override
+//			public IntWritable combine(IntWritable value1, IntWritable value2) {
+//				value1.set(value1.get() + value2.get());
+//				return value1;
+//			}
+//		});
 		
 	   @Override
 	    public void setup(Context context) throws IOException,
-	            InterruptedException {   	
-	    	
-	    	//int port = 7003;	// Default combier port
+	            InterruptedException {
+		   
 	    	//combiner.setPort(port);
-		    IMCombiner.setContext(context);
+		    //IMCCombiner.setContext(context);
+		    //INCCombiner.setPort(port);
+		   INCCombiner.setMapperStart(context.getTaskAttemptID().getTaskID().getId());
 	    }
 		   
 		@Override
@@ -103,7 +117,8 @@ public class Twitter {
 					dateWordPair.setWord(wordTxt);
 					
 					//context.write(dateWordPair, one);
-					IMCombiner.write(dateWordPair, one, context);
+					//IMCCombiner.write(dateWordPair, one, context);
+					INCCombiner.write(dateWordPair, one, context);
 				}								
 			}catch(Exception e){
 				//System.out.println(e.toString());
@@ -113,7 +128,8 @@ public class Twitter {
 		@Override
 		protected void cleanup(Context context) throws IOException, InterruptedException {
 			//combiner.close();
-			IMCombiner.flush(context);
+			//IMCCombiner.flush(context);
+			INCCombiner.flush(context);
 		}
 	}
 	

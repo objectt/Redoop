@@ -3,6 +3,10 @@ package com.boxple.redoop;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+//import java.text.SimpleDateFormat;
+//import java.util.Calendar;
+//import java.util.Date;
+//import java.util.Locale;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparable;
@@ -85,10 +89,17 @@ public class DateWordPair implements WritableComparable<DateWordPair>{
         public String toString(){
                 return first.toString() + "," + second.toString();
         }
+        
+        public void setDateWord(String str){
+        	String date = str.split(",")[0];
+        	String word = str.split(",")[1];
+        	
+			first = new DateKey(Integer.parseInt(date.substring(0, 4)), Integer.parseInt(date.substring(4, 6)), Integer.parseInt(date.substring(6)));
+			second.set(word);			
+        }
 
 
-        public static class FirstComparator extends WritableComparator{
-        //public static class FirstComparator extends RawComparator<DateWordPair>{                
+        public static class FirstComparator extends WritableComparator{         
                 public FirstComparator(){
                         super(DateWordPair.class, true);
                 }
