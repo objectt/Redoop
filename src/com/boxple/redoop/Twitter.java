@@ -39,7 +39,7 @@ public class Twitter {
 		
 		// In-Node Combiner Variables
 		private int port = 7003;
-		private int minThreshold = 5;
+		private int minThreshold = 0;
 		
 		private final CombinerNode<DateWordPair, IntWritable> INCCombiner = new CombinerNode<DateWordPair, IntWritable>(
 		new CombiningFunction<IntWritable>() {
@@ -129,7 +129,12 @@ public class Twitter {
 		protected void cleanup(Context context) throws IOException, InterruptedException {
 			//combiner.close();
 			//IMCCombiner.flush(context);
-			INCCombiner.flush(context);
+			try {
+				INCCombiner.flush(context);
+			} catch (ParseException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 	}
 	

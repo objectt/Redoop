@@ -9,6 +9,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import redis.clients.jedis.Jedis;
 
 import java.io.IOException;
+import java.text.ParseException;
 
 public class CombinerNode<KEY extends Writable, VALUE extends Writable> {
 	
@@ -47,25 +48,31 @@ public class CombinerNode<KEY extends Writable, VALUE extends Writable> {
 		  //cache.incr(prefix + "NUM");
 	  }
 	  
+	  public boolean isLastNodeMapper(){
+		  return false;
+	  }
+	  
 	  @SuppressWarnings({ "rawtypes", "unchecked" })
 	  public void write(KEY key, VALUE value, Mapper.Context context) 
 			  throws InterruptedException, IOException {
 
 		  key = WritableUtils.clone(key, context.getConfiguration());
 		  value = WritableUtils.clone(value, context.getConfiguration());
-		  
+		  		  
 		  keyStr = key.toString();
 		  valueStr = value.toString();
 		  valueInt = Integer.parseInt(valueStr);	// Fix
 
 		  if (combiningFunction != null){
-			try {				
-		        if (!cache.exists(keyStr)) {
-		        	cache.set(keyStr, valueStr);
-		        } else {
-		        	//cache.set(key, combiningFunction.combine(lruCache.get(key), value));
-		        	cache.incrBy(keyStr, valueInt);
-		        }
+			try {
+				cache.incrBy(keyStr, valueInt);
+				
+//		        if (!cache.exists(keyStr)){
+//		        	cache.set(keyStr, valueStr);
+//		        } else {
+//		        	//cache.set(key, combiningFunction.combine(lruCache.get(key), value));
+//		        	cache.incrBy(keyStr, valueInt);
+//		        }
 			} catch(Exception ex){}
 		  } else {
 			context.write(key, value);
@@ -73,22 +80,17 @@ public class CombinerNode<KEY extends Writable, VALUE extends Writable> {
 	  }
 
 	  @SuppressWarnings({ "rawtypes", "unchecked" })
-	  public void flush(Mapper.Context context) throws IOException, InterruptedException {
+	  public void flush(Mapper.Context context) throws IOException, InterruptedException, ParseException {		  
 		for(String key : cache.keys("*")){
-			System.out.println("key = " + key.substring(0, 7));		// DEBUG
-			if(!(key.substring(0, 7).equals(prefix))){
-				//System.out.println("key = " + key.substring(0, 7));		// DEBUG
-				
+			if(!(key.substring(0, prefix.length())).equals(prefix)){	
 				valueInt = Integer.parseInt(cache.get(key));
 				
-				if(valueInt > minThreshold){
+				if(valueInt > minThreshold || isLastNodeMapper()){
+					cache.del(key);
+					
 					//outputKey.set(key);
 					outputDateWordPair.setDateWord(key);
-					outputValue.set(valueInt);
-					
-					System.out.println("output = " + outputDateWordPair.toString());
-					
-					cache.del(key);
+					outputValue.set(valueInt);					
 					context.write(outputDateWordPair, outputValue);
 				}
 			}

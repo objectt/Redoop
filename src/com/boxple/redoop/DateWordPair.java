@@ -3,10 +3,10 @@ package com.boxple.redoop;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-//import java.text.SimpleDateFormat;
-//import java.util.Calendar;
-//import java.util.Date;
-//import java.util.Locale;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparable;
@@ -90,12 +90,19 @@ public class DateWordPair implements WritableComparable<DateWordPair>{
                 return first.toString() + "," + second.toString();
         }
         
-        public void setDateWord(String str){
-        	String date = str.split(",")[0];
-        	String word = str.split(",")[1];
-        	
-			first = new DateKey(Integer.parseInt(date.substring(0, 4)), Integer.parseInt(date.substring(4, 6)), Integer.parseInt(date.substring(6)));
-			second.set(word);			
+        public void setDateWord(String str) throws ParseException{
+        	String dateStr = str.split(",")[0];
+        	String wordStr = str.split(",")[1];
+        				
+			Calendar cal = Calendar.getInstance();
+			Date date = new SimpleDateFormat("yyyyMMdd").parse(dateStr);
+			cal.setTime(date);
+			DateKey dateKey = new DateKey(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
+			
+			setDate(dateKey);
+			second.set(wordStr);
+			
+			//first = new DateKey(Integer.parseInt(date.substring(0, 4)), Integer.parseInt(date.substring(4, 6)), Integer.parseInt(date.substring(6)));						
         }
 
 
