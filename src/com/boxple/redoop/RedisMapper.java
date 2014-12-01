@@ -36,6 +36,7 @@ public class RedisMapper extends Mapper<Text, Text, Text, IntWritable>{
     	
     	//System.out.println(port);
     	combiner.setPort(port);
+    	//combiner.setThreshold(context.getConfiguration().get("mapreduce.inc.threshold"));
     }
 	
 	@Override

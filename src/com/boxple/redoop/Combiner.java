@@ -13,7 +13,8 @@ public class Combiner extends Reducer<DateWordPair, IntWritable, DateWordPair, I
     @Override
     public void reduce(DateWordPair key, Iterable<IntWritable> values, Context output)
             throws IOException, InterruptedException {
-            	       
+        
+    	intCount = 0;
         for(IntWritable value: values){
         	intCount += value.get();
         }        

@@ -12,9 +12,7 @@ import java.util.Map;
 public class CombinerPre<KEY extends Writable, VALUE extends Writable> {
 	
 	  private static final int DEFAULT_CAPACITY = 10000000;
-	  private static final int MAX_CAPACITY = 70000000;
-	  //private static final int DEFAULT_CAPACITY = 75536;
-	  //private static final int DEFAULT_INITIAL_CAPACITY = 65536;
+	  private static final int MAX_CAPACITY = 40000000;
 	  private static final float DEFAULT_LOAD_FACTOR = .75F;	 
 	  	
 	  private Map < KEY, VALUE > lruCache;

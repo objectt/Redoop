@@ -39,7 +39,6 @@ public class Twitter {
 		
 		// In-Node Combiner Variables
 		private int port = 7003;
-		private int minThreshold = 0;
 		
 		private final CombinerNode<DateWordPair, IntWritable> INCCombiner = new CombinerNode<DateWordPair, IntWritable>(
 		new CombiningFunction<IntWritable>() {
@@ -48,7 +47,7 @@ public class Twitter {
 				value1.set(value1.get() + value2.get());
 				return value1;
 			}
-		}, port, minThreshold);
+		}, port);
 
 //		private final CombinerPre<DateWordPair, IntWritable> IMCCombiner = new CombinerPre<DateWordPair, IntWritable>(
 //		new CombiningFunction<IntWritable>() {
@@ -63,10 +62,8 @@ public class Twitter {
 	    public void setup(Context context) throws IOException,
 	            InterruptedException {
 		   
-	    	//combiner.setPort(port);
-		    //IMCCombiner.setContext(context);
-		    //INCCombiner.setPort(port);
-		   INCCombiner.setMapperStart(context.getTaskAttemptID().getTaskID().getId());
+		   //IMCCombiner.setContext(context);
+		   INCCombiner.initCombiner(context.getTaskAttemptID().getTaskID().getId(), context.getConfiguration().get("mapreduce.inc.threshold"));
 	    }
 		   
 		@Override
@@ -127,12 +124,10 @@ public class Twitter {
 		
 		@Override
 		protected void cleanup(Context context) throws IOException, InterruptedException {
-			//combiner.close();
-			//IMCCombiner.flush(context);
 			try {
+				//IMCCombiner.flush(context);
 				INCCombiner.flush(context);
 			} catch (ParseException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
@@ -140,14 +135,15 @@ public class Twitter {
 	
 
 	// REDUCER
-	public static class TwitReducer extends Reducer<DateWordPair, IntWritable, Text, IntWritable> {
+	public static class TwitReducer extends Reducer<DateWordPair, IntWritable, IntWritable, Text> {
 
-		private MultipleOutputs<Text, IntWritable> multipleOutputs;
+		private MultipleOutputs<IntWritable, Text> multipleOutputs;
 		private IntWritable outputSum = new IntWritable();
+		private int sum;
 
 		@Override
 		public void setup(Context context) throws IOException, InterruptedException {
-			multipleOutputs = new MultipleOutputs<Text, IntWritable>(context);
+			multipleOutputs = new MultipleOutputs<IntWritable, Text>(context);
 		}
 
 		@Override
@@ -155,15 +151,15 @@ public class Twitter {
 			throws IOException, InterruptedException {
 			
 			//System.out.println("reducer = " + key.getSecond());
-			int sum = 0;
+			sum = 0;
 			for(IntWritable value : values){
 				sum += value.get();
-			}			
+			}
 			outputSum.set(sum);
 			
 			//output.write(key.getSecond(), outputSum);
 			if(sum > 5)
-				multipleOutputs.write("twitByDate", key.getSecond(), outputSum, (key.getFirst()).toString());
+				multipleOutputs.write("twitByDate", outputSum, key.getSecond(), (key.getFirst()).toString());
 		}
 
 		@Override

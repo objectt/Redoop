@@ -30,7 +30,7 @@ public class Redoop extends Configured implements Tool{
     	//hdfs.delete(new Path("/grep/output-redoop"), true);
     	hdfs.delete(new Path(args[2]), true);
     			
-        //conf.set("mapreduce.redis.host", "147.46.121.158");
+        conf.set("mapreduce.inc.threshold", args[3]);
         //conf.set("mapreduce.redis.port", "7000");
   
         Job job = Job.getInstance(conf);
@@ -70,7 +70,7 @@ public class Redoop extends Configured implements Tool{
         job.setOutputValueClass(IntWritable.class);
         
         LazyOutputFormat.setOutputFormatClass(job, TextOutputFormat.class); 
-        MultipleOutputs.addNamedOutput(job, "twitByDate", TextOutputFormat.class, Text.class, IntWritable.class);
+        MultipleOutputs.addNamedOutput(job, "twitByDate", TextOutputFormat.class, IntWritable.class, Text.class);
         MultipleOutputs.setCountersEnabled(job, true);
         
 //		job.setCombinerClass(Combiner.class);
