@@ -1,4 +1,6 @@
-Hadoop + Redis
+Redoop = Hadoop + Redis
+=======
+
 
 In-Node Combiner
 =======
