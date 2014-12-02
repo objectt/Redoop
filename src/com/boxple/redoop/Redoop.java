@@ -82,7 +82,7 @@ public class Redoop extends Configured implements Tool{
 //        job.setMapOutputKeyClass(Text.class);
 //        job.setMapOutputValueClass(IntWritable.class);     
         
-        //job.setNumReduceTasks(1);
+        job.setNumReduceTasks(1);
         
         return job.waitForCompletion(true) ? 0 : 1;
 	}
